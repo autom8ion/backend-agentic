@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://127.0.0.1:*)",
+      "Bash(curl -s http://localhost:*)",
+      "Bash(docker compose -f docker/docker-compose.yml ps*)",
+      "Bash(docker compose -f docker/docker-compose.yml logs*)",
+      "Bash(docker info)",
+      "Bash(brew list *)",
+      "Bash(pytest --collect-only)"
+    ]
+  }
+}
