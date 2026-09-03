@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS orders (
+    id SERIAL PRIMARY KEY,
+    sku TEXT NOT NULL,
+    qty INTEGER NOT NULL,
+    amount NUMERIC(10, 2) NOT NULL,
+    status TEXT NOT NULL DEFAULT 'created',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
