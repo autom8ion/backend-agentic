@@ -42,9 +42,9 @@ whether it needs a third-party client library that should be an optional extra.
            "XAgent requires the '<domain>' extra: pip install backend-agentic[<domain>]"
        ) from exc
    ```
-   This is what lets `pytest --collect-only` keep working when the extra isn't
-   installed - the import only happens when the fixture is actually requested,
-   never at plugin/package load time. Do **not** import the new agent module
+   This is what lets `uv run pytest --collect-only` keep working when the
+   extra isn't synced in - the import only happens when the fixture is
+   actually requested, never at plugin/package load time. Do **not** import the new agent module
    at the top of `plugin.py` if it has an optional dependency; import it
    lazily inside the fixture body instead (see `db_agent`/`kafka_agent` in
    `plugin.py` for the pattern; `recon_agent`/`perf_agent` show the
@@ -88,10 +88,10 @@ whether it needs a third-party client library that should be an optional extra.
     documenting (like `rollback_after()` or `eventually_sync()` polling did).
 
 11. **Verify before considering this done**:
-    - `python -m py_compile` the new files.
-    - `pytest --collect-only` succeeds *without* the new extra installed (if
-      there is one) - this is the concrete proof the lazy-import boundary
-      holds. Uninstall it first if it happens to already be present.
+    - `uv run python -m py_compile` the new files.
+    - `uv run pytest --collect-only` succeeds when synced *without* the new
+      extra (`uv sync` with no `--extra <domain>`) - this is the concrete
+      proof the lazy-import boundary holds, not just that the code compiles.
     - If you can reach a real instance of the thing being tested (a local
       server, container, or stub), exercise the agent directly in a throwaway
       script the way `RestAgent`/`DbAgent`/`PerfAgent` were verified during

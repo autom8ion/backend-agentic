@@ -60,11 +60,20 @@ backend_agentic/
 
 ## Install
 
+This project uses [uv](https://docs.astral.sh/uv/). `uv sync` creates
+`.venv` and installs the locked dependency set (core deps + the `dev` group)
+from `uv.lock`; add `--extra` per optional agent, or `--all-extras` for
+everything:
+
 ```bash
-pip install -e ".[dev]"          # core framework only
-pip install -e ".[db,kafka,perf]"  # + DB, Kafka and Locust perf-testing agents
-pip install -e ".[all]"          # everything, including testcontainers + allure-pytest
+uv sync                              # core framework + dev tooling (ruff, mypy, pytest-cov)
+uv sync --extra db --extra kafka --extra perf   # + DB, Kafka and Locust perf-testing agents
+uv sync --all-extras                 # everything, including testcontainers + allure-pytest
+uv run pytest                        # run anything through the project's venv, no activation needed
 ```
+
+Plain `pip` still works if you'd rather not use uv - `pip install -e ".[db,kafka,perf]"`
+against your own venv - it just won't use the lockfile.
 
 `confluent-kafka` needs `librdkafka` on the host (`brew install librdkafka` /
 `apt-get install librdkafka-dev`) - or just run tests against the Dockerized
@@ -96,7 +105,7 @@ Configure targets via environment variables (see `.env.example`):
 ```bash
 cp .env.example .env
 # edit .env, then:
-pytest -m rest
+uv run pytest -m rest
 ```
 
 ### Available fixtures
@@ -223,9 +232,9 @@ the whole framework is demonstrable end to end:
 ```bash
 docker compose -f docker/docker-compose.yml up -d --build
 cp .env.example .env
-pytest                      # everything
-pytest -m rest              # just REST
-pytest -m "not e2e"         # skip the full cross-system scenario
+uv run pytest                      # everything
+uv run pytest -m rest              # just REST
+uv run pytest -m "not e2e"         # skip the full cross-system scenario
 ```
 
 Tests marked `rest`/`graphql`/`db`/`kafka`/`reconciliation`/`perf`/`e2e` are
@@ -261,8 +270,9 @@ isn't reachable, instead of failing with a raw connection error.
 ## Development
 
 ```bash
-pip install -e ".[dev]"
-ruff check src tests
-mypy src
-pytest --collect-only          # sanity-check fixture wiring without any live services
+uv sync                              # installs the dev group (ruff, mypy, pytest-cov) by default
+uv run ruff check src tests
+uv run mypy src
+uv run pytest --collect-only         # sanity-check fixture wiring without any live services
+uv lock                              # after changing dependencies in pyproject.toml
 ```

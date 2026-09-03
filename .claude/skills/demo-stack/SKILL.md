@@ -44,11 +44,15 @@ something is broken.
 
 ## Running tests against it
 
+Make sure the venv actually has the extras the tests need first
+(`uv sync --extra db --extra kafka --extra perf`, or `--all-extras`) - the
+demo stack being up doesn't imply those are synced in.
+
 ```bash
-pytest                 # everything, now un-skipped
-pytest -m rest         # one domain at a time
-pytest -m "not e2e"    # skip the full cross-system scenario
-pytest tests/perf/test_perf_gate.py   # the Locust-based perf gate specifically
+uv run pytest                 # everything, now un-skipped
+uv run pytest -m rest         # one domain at a time
+uv run pytest -m "not e2e"    # skip the full cross-system scenario
+uv run pytest tests/perf/test_perf_gate.py   # the Locust-based perf gate specifically
 ```
 
 ## Tearing it down

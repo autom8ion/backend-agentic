@@ -34,13 +34,15 @@ kafka = ["confluent-kafka>=2.5"]
 perf = ["locust>=2.31"]
 containers = ["testcontainers[postgres,kafka]>=4.8"]
 reporting = ["allure-pytest>=2.13"]
+all = [
+    "backend-agentic[db,kafka,perf,containers,reporting]",
+]
+
+[dependency-groups]
 dev = [
     "ruff>=0.6",
     "mypy>=1.11",
     "pytest-cov>=5.0",
-]
-all = [
-    "backend-agentic[db,kafka,perf,containers,reporting]",
 ]
 
 [project.entry-points.pytest11]
@@ -52,6 +54,7 @@ where = ["src"]
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
+pythonpath = ["."]
 asyncio_mode = "auto"
 addopts = "-ra --strict-markers --strict-config"
 markers = [

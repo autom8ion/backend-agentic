@@ -13,33 +13,47 @@ covers what a Claude session needs to work *on* the framework itself.
 
 ## Commands
 
-Set up a venv and install (editable, so `src/` changes are picked up immediately):
+This project uses [uv](https://docs.astral.sh/uv/) - `pyproject.toml` +
+`uv.lock` + `.python-version` (pinned to 3.12) are the source of truth for
+dependencies and the interpreter. `uv sync` creates/updates `.venv`
+automatically; there's no separate manual venv-creation step.
 
 ```bash
-python3 -m venv .venv
-./.venv/bin/pip install -e ".[dev]"          # core only
-./.venv/bin/pip install -e ".[db,kafka,perf]"  # + DB, Kafka, Locust perf agents
-./.venv/bin/pip install -e ".[all]"           # everything
-export POLARS_SKIP_CPU_CHECK=1                # only needed on a CPU polars flags as unsupported (e.g. under emulation)
+uv sync                              # core deps + the `dev` group (ruff, mypy, pytest-cov)
+uv sync --extra db --extra kafka --extra perf   # + DB, Kafka, Locust perf agents
+uv sync --all-extras                 # everything, including testcontainers + allure-pytest
 ```
 
 `confluent-kafka` (the `kafka` extra) needs `librdkafka` on the host
 (`brew install librdkafka` / `apt-get install librdkafka-dev`) to build.
 
-Run tests:
+On a Mac where the resolved Python turns out to be x86_64 running under
+Rosetta (check with `uv run python -c "import platform; print(platform.machine())"`
+- should print `arm64` on Apple Silicon), `uv`'s wheel resolution still
+correctly fetches arm64 wheels for C-extension deps (gevent, connectorx,
+confluent-kafka, ...), which then fail to import against an x86_64
+interpreter. Fix it at the interpreter, not with `POLARS_SKIP_CPU_CHECK`:
+`uv python install cpython-3.12-macos-aarch64-none`, confirm it matches
+`.python-version`, then `rm -rf .venv && uv sync` again.
+
+Run tests, via `uv run` so they use the project's own venv without activating it:
 
 ```bash
-pytest --collect-only          # sanity-check fixture wiring; must pass with ANY subset of extras installed
-pytest                         # everything; tests needing the demo stack auto-skip if it's not up
-pytest tests/db/test_orders_db.py::test_created_order_is_persisted   # a single test
-pytest -m rest                 # by marker: rest/graphql/db/kafka/reconciliation/perf/e2e
-pytest -m "not e2e"
+uv run pytest --collect-only          # sanity-check fixture wiring; must pass with ANY subset of extras installed
+uv run pytest                         # everything; tests needing the demo stack auto-skip if it's not up
+uv run pytest tests/db/test_orders_db.py::test_created_order_is_persisted   # a single test
+uv run pytest -m rest                 # by marker: rest/graphql/db/kafka/reconciliation/perf/e2e
+uv run pytest -m "not e2e"
 ```
 
 The example tests in `tests/` are integration tests against the Dockerized demo app,
 not unit tests of the framework's own logic — there is currently no unit-test suite
 for `reconcile()`, the `PerfAgent` CSV parsing, or the assertpy2 extensions/matchers
-in isolation. Bring up the demo stack before running them for real:
+in isolation. (This is not hypothetical: the `PerfAgent` CSV parser shipped with a
+bug - it didn't handle Locust's `N/A` percentile value on a zero-request row - that
+only surfaced by actually running it, because nothing exercised that code path in
+isolation. Prefer a real run over trusting new agent code compiles.) Bring up the
+demo stack before running the integration tests for real:
 
 ```bash
 docker compose -f docker/docker-compose.yml up -d --build
@@ -49,9 +63,12 @@ cp .env.example .env
 Lint / type-check:
 
 ```bash
-ruff check src tests
-mypy src
+uv run ruff check src tests
+uv run mypy src
 ```
+
+After changing dependencies in `pyproject.toml`, run `uv lock` and commit the
+updated `uv.lock`.
 
 ## Architecture
 

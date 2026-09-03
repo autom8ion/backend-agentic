@@ -79,20 +79,29 @@ class PerfEndpointStats:
 
     @classmethod
     def _from_csv_row(cls, row: dict[str, str]) -> "PerfEndpointStats":
+        # Locust writes "N/A" for response-time columns on a row with zero requests
+        # (a low-volume/short run can easily leave one endpoint untouched) - 0.0 is
+        # the right read for "no data", not a parse error.
+        def as_float(value: str) -> float:
+            try:
+                return float(value)
+            except ValueError:
+                return 0.0
+
         kwargs: dict[str, object] = dict(
             method=row["Type"],
             name=row["Name"],
             request_count=int(row["Request Count"]),
             failure_count=int(row["Failure Count"]),
-            median_ms=float(row["Median Response Time"]),
-            average_ms=float(row["Average Response Time"]),
-            min_ms=float(row["Min Response Time"]),
-            max_ms=float(row["Max Response Time"]),
-            requests_per_sec=float(row["Requests/s"]),
-            failures_per_sec=float(row["Failures/s"]),
+            median_ms=as_float(row["Median Response Time"]),
+            average_ms=as_float(row["Average Response Time"]),
+            min_ms=as_float(row["Min Response Time"]),
+            max_ms=as_float(row["Max Response Time"]),
+            requests_per_sec=as_float(row["Requests/s"]),
+            failures_per_sec=as_float(row["Failures/s"]),
         )
         for column, attr in _PERCENTILE_COLUMNS.items():
-            kwargs[attr] = float(row[column])
+            kwargs[attr] = as_float(row[column])
         return cls(**kwargs)  # type: ignore[arg-type]
 
 
