@@ -1,0 +1,11 @@
+# GitGuardian ignore config (https://docs.gitguardian.com/ggshield-docs/reference/gitguardian-yaml).
+# docker/docker-compose.yml's Postgres password is for the local-only demo
+# stack this repo brings up on localhost (see README.md "Install" / demo-stack
+# skill) -- not a real secret. Do not add a real secret to this ignore list;
+# if one is ever accidentally committed, rotate it and remove it from
+# history instead of adding it here.
+version: 2
+
+secret:
+  ignored_paths:
+    - "docker/docker-compose.yml"
