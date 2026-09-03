@@ -11,6 +11,11 @@ shared `TestContext` so a multi-system scenario gets one readable timeline when 
 fails. See `README.md` for the full user-facing API and design rationale — this file
 covers what a Claude session needs to work *on* the framework itself.
 
+Two skills cover common maintenance tasks end to end — prefer them over
+improvising the steps manually: `demo-stack` (bring the Docker demo stack up/down
+and run the integration tests against it) and `new-agent` (scaffold a new domain
+agent following the exact `BaseAgent` pattern below).
+
 ## Commands
 
 This project uses [uv](https://docs.astral.sh/uv/) - `pyproject.toml` +
@@ -146,3 +151,16 @@ both the REST routes (`app/main.py`) and the GraphQL resolvers
 `rest`/`graphql`/`db`/`kafka`/`reconciliation`/`perf`/`e2e` with a clear message if
 `GET {rest.base_url}/health` isn't reachable, instead of failing with a raw
 connection error — keep new example tests marked accordingly.
+
+**Gotchas to preserve when touching an existing agent.** These are covered in
+depth in README's "Design notes worth knowing before extending this" section;
+they matter enough to flag here too:
+- Writes are never auto-retried (`RestAgent` retries only `GET`/`HEAD`/`OPTIONS`,
+  `GraphQLAgent.mutate()` is never retried) — a retried write on a timeout could
+  double-create data.
+- Every `KafkaAgent` consumer gets a unique, per-call consumer group stamped
+  with the scenario's `correlation_id`, reading from the earliest offset —
+  don't reuse group ids, or parallel tests will steal each other's messages.
+- `DbAgent.query_df` binds parameters through SQLAlchemy rather than
+  string-formatting them into SQL; the `connectorx` fast path
+  (`polars.read_database_uri`) is used only for parameter-free queries.
