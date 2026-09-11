@@ -19,9 +19,12 @@ agent following the exact `BaseAgent` pattern below).
 ## Commands
 
 This project uses [uv](https://docs.astral.sh/uv/) - `pyproject.toml` +
-`uv.lock` + `.python-version` (pinned to 3.12) are the source of truth for
-dependencies and the interpreter. `uv sync` creates/updates `.venv`
-automatically; there's no separate manual venv-creation step.
+`uv.lock` + `.python-version` (pinned to 3.14, the latest CPython release
+that every dependency - including the C-extension ones like
+`confluent-kafka`, `connectorx`, and `gevent` - ships a wheel for) are the
+source of truth for dependencies and the interpreter. `uv sync`
+creates/updates `.venv` automatically; there's no separate manual
+venv-creation step.
 
 ```bash
 uv sync                              # core deps + the `dev` group (ruff, mypy, pytest-cov, hypothesis, syrupy)
@@ -39,7 +42,7 @@ Rosetta (check with `uv run python -c "import platform; print(platform.machine()
 correctly fetches arm64 wheels for C-extension deps (gevent, connectorx,
 confluent-kafka, ...), which then fail to import against an x86_64
 interpreter. Fix it at the interpreter, not with `POLARS_SKIP_CPU_CHECK`:
-`uv python install cpython-3.12-macos-aarch64-none`, confirm it matches
+`uv python install cpython-3.14-macos-aarch64-none`, confirm it matches
 `.python-version`, then `rm -rf .venv && uv sync` again.
 
 Run tests, via `uv run` so they use the project's own venv without activating it:

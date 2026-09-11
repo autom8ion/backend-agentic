@@ -80,6 +80,6 @@ line-length = 110
 target-version = "py311"
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.14"
 strict = true
 ignore_missing_imports = true
