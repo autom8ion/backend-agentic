@@ -16,8 +16,9 @@ test without leaving it behind.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Any, Iterator
+from typing import Any
 
 try:
     import polars as pl
@@ -64,7 +65,7 @@ class DbAgent(BaseAgent):
 
     def query_df(
         self, sql: str, params: dict[str, Any] | None = None, *, connection: str = "default"
-    ) -> "pl.DataFrame":
+    ) -> pl.DataFrame:
         with self.step("query_df", detail=sql[:120]):
             if params:
                 engine = self._engine(connection)
@@ -72,7 +73,7 @@ class DbAgent(BaseAgent):
                     return pl.read_database(query=text(sql), connection=conn, execute_options={"parameters": params})
             try:
                 return pl.read_database_uri(query=sql, uri=self._dsn(connection))
-            except Exception:
+            except Exception:  # noqa: BLE001 - connectorx fast path falls back to SQLAlchemy on any failure
                 engine = self._engine(connection)
                 with engine.connect() as conn:
                     return pl.read_database(query=text(sql), connection=conn)
@@ -95,7 +96,7 @@ class DbAgent(BaseAgent):
         return next(iter(row.values()))
 
     @contextmanager
-    def rollback_after(self, connection: str = "default") -> Iterator["Connection"]:
+    def rollback_after(self, connection: str = "default") -> Iterator[Connection]:
         """Yield a connection inside a transaction that is always rolled back.
 
         Use to insert fixture rows a test needs without leaving them behind::

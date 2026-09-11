@@ -65,7 +65,7 @@ class ReconciliationResult:
                 lines.append(textwrap.indent(str(frame.head(10)), "    "))
         return "\n".join(lines)
 
-    def to_dict(self) -> dict:
+    def to_dict(self) -> dict[str, object]:
         return {
             "is_reconciled": self.is_reconciled,
             "match_rate": self.match_rate,

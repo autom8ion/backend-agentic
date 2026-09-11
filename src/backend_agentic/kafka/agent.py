@@ -21,8 +21,9 @@ from __future__ import annotations
 import json
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 try:
     import polars as pl
@@ -184,7 +185,7 @@ class KafkaAgent(BaseAgent):
         group_id: str | None = None,
         from_beginning: bool = True,
         value_deserializer: Callable[[bytes], Any] = json.loads,
-    ) -> "pl.DataFrame":
+    ) -> pl.DataFrame:
         """Collect a topic's messages into a polars DataFrame, for reconciliation."""
         messages = self.consume_all(
             topic, timeout=timeout, group_id=group_id, from_beginning=from_beginning,

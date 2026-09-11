@@ -10,8 +10,9 @@ different ``settings`` source, a session-scoped ``db_agent``, ...).
 
 from __future__ import annotations
 
-from typing import Iterator
+from collections.abc import Generator, Iterator
 
+import pluggy
 import pytest
 
 from backend_agentic.assertions.extensions import register_all
@@ -28,7 +29,9 @@ def pytest_configure(config: pytest.Config) -> None:
 
 
 @pytest.hookimpl(hookwrapper=True)
-def pytest_runtest_makereport(item: pytest.Item, call: pytest.CallInfo) -> Iterator[None]:
+def pytest_runtest_makereport(
+    item: pytest.Item, call: pytest.CallInfo[None]
+) -> Generator[None, pluggy.Result[pytest.TestReport], None]:
     outcome = yield
     report = outcome.get_result()
     if report.when != "call" or not report.failed:
