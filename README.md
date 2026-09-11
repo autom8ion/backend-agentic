@@ -66,8 +66,9 @@ from `uv.lock`; add `--extra` per optional agent, or `--all-extras` for
 everything:
 
 ```bash
-uv sync                              # core framework + dev tooling (ruff, mypy, pytest-cov)
+uv sync                              # core framework + dev tooling (ruff, mypy, pytest-cov, hypothesis, syrupy)
 uv sync --extra db --extra kafka --extra perf   # + DB, Kafka and Locust perf-testing agents
+uv sync --extra data-quality         # + Great Expectations data-quality checks
 uv sync --all-extras                 # everything, including testcontainers + allure-pytest
 uv run pytest                        # run anything through the project's venv, no activation needed
 ```
@@ -223,6 +224,78 @@ locust -f tests/perf/locustfile.py --host http://localhost:8000
 stamps a correlation id on every request, the same convention `RestAgent`
 uses - it adds nothing Locust-specific of its own.
 
+### Property-based, snapshot, and data-quality testing
+
+Three testing styles round out the toolbox alongside the domain agents -
+[Hypothesis](https://hypothesis.readthedocs.io/) for property-based tests,
+[syrupy](https://github.com/tophat/syrupy) for snapshot tests, and
+[Great Expectations](https://greatexpectations.io/) for dataset-quality
+checks. All three are set up and demonstrated in `tests/unit/` - pure unit
+tests that need no demo stack and no `db`/`kafka`/etc. extra, closing the gap
+this project used to call out explicitly: `reconcile()`, the `PerfAgent` CSV
+parser, and the assertpy2 matchers had no isolated test coverage before this.
+
+**Hypothesis** generates far more input shapes than anyone would hand-write,
+which is exactly the point for pure logic like `reconcile()`'s join
+classification or `PerfEndpointStats._from_csv_row`'s CSV parsing (the
+function that shipped the real "N/A"-on-a-zero-request-row bug mentioned
+above):
+
+```python
+from hypothesis import given, strategies as st
+from backend_agentic.reconciliation.agent import reconcile
+
+@given(left_ids=st.lists(st.integers(min_value=0, max_value=30), unique=True, max_size=12), ...)
+def test_matched_and_mismatched_agree_with_a_naive_set_comparison(left_ids, ...):
+    result = reconcile(left, right, keys=["id"])
+    # assert result's buckets against a plain-Python set computation over the same inputs
+```
+
+See `tests/unit/test_reconciliation_properties.py` and
+`tests/unit/test_perf_csv_parsing_properties.py` for the full strategies.
+
+**syrupy** locks down a report's *formatting*, not just its logic, via the
+`snapshot` fixture - useful for `.summary()`/`.timeline()` output that a
+regular assertion would never notice drifting:
+
+```python
+def test_timeline_snapshot(snapshot):
+    assert context.timeline() == snapshot
+```
+
+Regenerate the committed snapshots (`tests/unit/__snapshots__/`) after a
+deliberate, reviewed formatting change:
+
+```bash
+uv run pytest tests/unit/test_report_snapshots.py --snapshot-update
+```
+
+**Great Expectations** (the `data-quality` extra) validates a *single*
+dataset's shape and business rules - schema, nulls, uniqueness, value
+ranges, allowed sets, format patterns - a different question than
+reconciliation's "do two datasets agree with each other":
+
+```python
+import great_expectations as gx
+from great_expectations.expectations import ExpectColumnValuesToBeUnique
+
+context = gx.get_context(mode="ephemeral")
+suite = context.suites.add(gx.ExpectationSuite(name="orders"))
+suite.add_expectation(ExpectColumnValuesToBeUnique(column="id"))
+
+asset = context.data_sources.add_pandas("orders_source").add_dataframe_asset("orders")
+batch = asset.add_batch_definition_whole_dataframe("b").get_batch(batch_parameters={"dataframe": orders_df})
+
+result = batch.validate(suite)
+assert result.success
+```
+
+Like `db`/`kafka`, `great_expectations` is never imported at package
+top-level; `tests/unit/test_data_quality_examples.py` gates its own import
+with `pytest.importorskip("great_expectations")` so `pytest --collect-only`
+stays clean without the extra installed - the same collection invariant the
+project's other optional extras follow.
+
 ## The demo stack
 
 `docker/` contains a small FastAPI + Strawberry GraphQL + Postgres + Redpanda
@@ -270,9 +343,10 @@ isn't reachable, instead of failing with a raw connection error.
 ## Development
 
 ```bash
-uv sync                              # installs the dev group (ruff, mypy, pytest-cov) by default
+uv sync                              # installs the dev group (ruff, mypy, pytest-cov, hypothesis, syrupy) by default
 uv run ruff check src tests
 uv run mypy src
 uv run pytest --collect-only         # sanity-check fixture wiring without any live services
+uv run pytest tests/unit             # pure unit tests (Hypothesis/syrupy/Great Expectations examples) - no demo stack needed
 uv lock                              # after changing dependencies in pyproject.toml
 ```
