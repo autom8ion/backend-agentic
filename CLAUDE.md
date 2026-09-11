@@ -19,13 +19,17 @@ agent following the exact `BaseAgent` pattern below).
 ## Commands
 
 This project uses [uv](https://docs.astral.sh/uv/) - `pyproject.toml` +
-`uv.lock` + `.python-version` (pinned to 3.12) are the source of truth for
-dependencies and the interpreter. `uv sync` creates/updates `.venv`
-automatically; there's no separate manual venv-creation step.
+`uv.lock` + `.python-version` (pinned to 3.14, the latest CPython release
+that every dependency - including the C-extension ones like
+`confluent-kafka`, `connectorx`, and `gevent` - ships a wheel for) are the
+source of truth for dependencies and the interpreter. `uv sync`
+creates/updates `.venv` automatically; there's no separate manual
+venv-creation step.
 
 ```bash
-uv sync                              # core deps + the `dev` group (ruff, mypy, pytest-cov)
+uv sync                              # core deps + the `dev` group (ruff, mypy, pytest-cov, hypothesis, syrupy)
 uv sync --extra db --extra kafka --extra perf   # + DB, Kafka, Locust perf agents
+uv sync --extra data-quality         # + Great Expectations data-quality checks
 uv sync --all-extras                 # everything, including testcontainers + allure-pytest
 ```
 
@@ -38,7 +42,7 @@ Rosetta (check with `uv run python -c "import platform; print(platform.machine()
 correctly fetches arm64 wheels for C-extension deps (gevent, connectorx,
 confluent-kafka, ...), which then fail to import against an x86_64
 interpreter. Fix it at the interpreter, not with `POLARS_SKIP_CPU_CHECK`:
-`uv python install cpython-3.12-macos-aarch64-none`, confirm it matches
+`uv python install cpython-3.14-macos-aarch64-none`, confirm it matches
 `.python-version`, then `rm -rf .venv && uv sync` again.
 
 Run tests, via `uv run` so they use the project's own venv without activating it:
@@ -51,14 +55,24 @@ uv run pytest -m rest                 # by marker: rest/graphql/db/kafka/reconci
 uv run pytest -m "not e2e"
 ```
 
-The example tests in `tests/` are integration tests against the Dockerized demo app,
-not unit tests of the framework's own logic — there is currently no unit-test suite
-for `reconcile()`, the `PerfAgent` CSV parsing, or the assertpy2 extensions/matchers
-in isolation. (This is not hypothetical: the `PerfAgent` CSV parser shipped with a
-bug - it didn't handle Locust's `N/A` percentile value on a zero-request row - that
-only surfaced by actually running it, because nothing exercised that code path in
-isolation. Prefer a real run over trusting new agent code compiles.) Bring up the
-demo stack before running the integration tests for real:
+Most example tests in `tests/` (`tests/rest`, `tests/db`, ...) are integration tests
+against the Dockerized demo app, not unit tests of the framework's own logic.
+`tests/unit/` is the exception — pure unit tests needing no demo stack and no
+`db`/`kafka`/etc. extra, covering `reconcile()`'s join classification, the
+`PerfAgent` CSV parser, and the assertpy2 `is_uuid`/`is_iso_datetime` matchers in
+isolation, via [Hypothesis](https://hypothesis.readthedocs.io/) property tests. (This
+gap was not hypothetical before `tests/unit/` existed: the `PerfAgent` CSV parser
+shipped with a bug - it didn't handle Locust's `N/A` percentile value on a
+zero-request row - that only surfaced by actually running it, because nothing
+exercised that code path in isolation; `tests/unit/test_perf_csv_parsing_properties.py`
+now encodes that exact regression as a property. Prefer a real run over trusting new
+agent code compiles.) `tests/unit/` also has [syrupy](https://github.com/tophat/syrupy)
+snapshot tests locking down `.summary()`/`.timeline()` *formatting*
+(`test_report_snapshots.py`, regenerate via `--snapshot-update`) and
+[Great Expectations](https://greatexpectations.io/) dataset-quality examples
+(`test_data_quality_examples.py`, behind the `data-quality` extra and its own
+`pytest.importorskip`, following the same lazy-extra shape as `db`/`kafka` below).
+Bring up the demo stack before running the integration tests for real:
 
 ```bash
 docker compose -f docker/docker-compose.yml up -d --build

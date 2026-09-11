@@ -1,0 +1,56 @@
+# serializer version: 1
+# name: test_perf_result_summary_snapshot
+  '''
+  Perf run: 150 requests, 2 failed (1.33%), 5.0 req/s
+    GET    GET /orders                              reqs=100    fail=2     p50=10ms p95=180ms p99=20ms max=40ms
+    GET    POST /orders                             reqs=50     fail=0     p50=10ms p95=90ms p99=20ms max=40ms
+    sample failures:
+      {'method': 'GET', 'name': 'GET /orders', 'error': 'ConnectionRefusedError'}
+  '''
+# ---
+# name: test_reconciliation_summary_snapshot
+  '''
+  Reconciliation on keys=['id']:
+    matched:       1
+    mismatched:    1 row(s), 1 field diff(s)
+    only in left:  1
+    only in right: 1
+    match rate:    25.00%
+    sample mismatches:
+      shape: (1, 4)
+      ┌─────┬────────┬────────────┬─────────────┐
+      │ id  ┆ column ┆ left_value ┆ right_value │
+      │ --- ┆ ---    ┆ ---        ┆ ---         │
+      │ i64 ┆ str    ┆ str        ┆ str         │
+      ╞═════╪════════╪════════════╪═════════════╡
+      │ 3   ┆ amount ┆ 30.0       ┆ 99.0        │
+      └─────┴────────┴────────────┴─────────────┘
+    sample only-in-left:
+      shape: (1, 2)
+      ┌─────┬────────┐
+      │ id  ┆ amount │
+      │ --- ┆ ---    │
+      │ i64 ┆ f64    │
+      ╞═════╪════════╡
+      │ 1   ┆ 10.0   │
+      └─────┴────────┘
+    sample only-in-right:
+      shape: (1, 2)
+      ┌─────┬────────┐
+      │ id  ┆ amount │
+      │ --- ┆ ---    │
+      │ i64 ┆ f64    │
+      ╞═════╪════════╡
+      │ 4   ┆ 40.0   │
+      └─────┴────────┘
+  '''
+# ---
+# name: test_timeline_snapshot
+  '''
+  Timeline for 'test_example_scenario' (correlation_id=fixed-correlation-id):
+     1. [ok  ] rest       post                     (12.3ms) POST /orders
+     2. [ok  ] db         query_one                (3.2ms) SELECT * FROM orders WHERE id = :id
+     3. [FAIL] kafka      wait_for_message         (5004.1ms) topic=orders.events timeout=5.0s
+          -> KafkaWaitTimeoutError: No message on topic 'orders.events' matched the predicate within 5.0s
+  '''
+# ---
