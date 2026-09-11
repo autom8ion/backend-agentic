@@ -78,7 +78,7 @@ class PerfEndpointStats:
         return self.failure_count / self.request_count if self.request_count else 0.0
 
     @classmethod
-    def _from_csv_row(cls, row: dict[str, str]) -> "PerfEndpointStats":
+    def _from_csv_row(cls, row: dict[str, str]) -> PerfEndpointStats:
         # Locust writes "N/A" for response-time columns on a row with zero requests
         # (a low-volume/short run can easily leave one endpoint untouched) - 0.0 is
         # the right read for "no data", not a parse error.
@@ -88,18 +88,18 @@ class PerfEndpointStats:
             except ValueError:
                 return 0.0
 
-        kwargs: dict[str, object] = dict(
-            method=row["Type"],
-            name=row["Name"],
-            request_count=int(row["Request Count"]),
-            failure_count=int(row["Failure Count"]),
-            median_ms=as_float(row["Median Response Time"]),
-            average_ms=as_float(row["Average Response Time"]),
-            min_ms=as_float(row["Min Response Time"]),
-            max_ms=as_float(row["Max Response Time"]),
-            requests_per_sec=as_float(row["Requests/s"]),
-            failures_per_sec=as_float(row["Failures/s"]),
-        )
+        kwargs: dict[str, object] = {
+            "method": row["Type"],
+            "name": row["Name"],
+            "request_count": int(row["Request Count"]),
+            "failure_count": int(row["Failure Count"]),
+            "median_ms": as_float(row["Median Response Time"]),
+            "average_ms": as_float(row["Average Response Time"]),
+            "min_ms": as_float(row["Min Response Time"]),
+            "max_ms": as_float(row["Max Response Time"]),
+            "requests_per_sec": as_float(row["Requests/s"]),
+            "failures_per_sec": as_float(row["Failures/s"]),
+        }
         for column, attr in _PERCENTILE_COLUMNS.items():
             kwargs[attr] = as_float(row[column])
         return cls(**kwargs)  # type: ignore[arg-type]
@@ -125,9 +125,11 @@ class PerfResult:
 
     def summary(self) -> str:
         lines = [
-            f"Perf run: {self.aggregate.request_count} requests, "
-            f"{self.aggregate.failure_count} failed ({self.failure_ratio:.2%}), "
-            f"{self.aggregate.requests_per_sec:.1f} req/s"
+            (
+                f"Perf run: {self.aggregate.request_count} requests, "
+                f"{self.aggregate.failure_count} failed ({self.failure_ratio:.2%}), "
+                f"{self.aggregate.requests_per_sec:.1f} req/s"
+            )
         ]
         for e in self.endpoints:
             lines.append(
@@ -141,7 +143,7 @@ class PerfResult:
         return "\n".join(lines)
 
     @classmethod
-    def _from_csv(cls, csv_prefix: Path, *, returncode: int, stdout: str) -> "PerfResult":
+    def _from_csv(cls, csv_prefix: Path, *, returncode: int, stdout: str) -> PerfResult:
         rows = list(csv.DictReader(Path(f"{csv_prefix}_stats.csv").read_text().splitlines()))
         endpoints = [PerfEndpointStats._from_csv_row(r) for r in rows if r["Name"] != "Aggregated"]
         aggregate = PerfEndpointStats._from_csv_row(next(r for r in rows if r["Name"] == "Aggregated"))
@@ -181,36 +183,38 @@ class PerfAgent(BaseAgent):
         :class:`~backend_agentic.core.exceptions.PerfRunError`.
         """
         detail = f"{Path(locustfile).name} users={users} run_time={run_time}"
-        with self.step("run", detail=detail):
-            with tempfile.TemporaryDirectory(prefix="backend-agentic-perf-") as tmp:
-                csv_prefix = Path(tmp) / "run"
-                cmd = [
-                    sys.executable,
-                    "-m",
-                    "locust",
-                    "-f",
-                    str(locustfile),
-                    "--headless",
-                    "-u",
-                    str(users),
-                    "-r",
-                    str(spawn_rate),
-                    "-t",
-                    run_time,
-                    "--host",
-                    host or self.rest_settings.base_url,
-                    "--csv",
-                    str(csv_prefix),
-                    "--loglevel",
-                    "WARNING",
-                    *(user_classes or []),
-                    *(extra_args or []),
-                ]
-                proc = subprocess.run(cmd, capture_output=True, text=True)
-                stats_path = Path(f"{csv_prefix}_stats.csv")
-                if not stats_path.exists():
-                    raise PerfRunError(
-                        f"locust did not produce stats (exit code {proc.returncode}).\n"
-                        f"cmd: {' '.join(cmd)}\n--- stdout ---\n{proc.stdout}\n--- stderr ---\n{proc.stderr}"
-                    )
-                return PerfResult._from_csv(csv_prefix, returncode=proc.returncode, stdout=proc.stdout)
+        with (
+            self.step("run", detail=detail),
+            tempfile.TemporaryDirectory(prefix="backend-agentic-perf-") as tmp,
+        ):
+            csv_prefix = Path(tmp) / "run"
+            cmd = [
+                sys.executable,
+                "-m",
+                "locust",
+                "-f",
+                str(locustfile),
+                "--headless",
+                "-u",
+                str(users),
+                "-r",
+                str(spawn_rate),
+                "-t",
+                run_time,
+                "--host",
+                host or self.rest_settings.base_url,
+                "--csv",
+                str(csv_prefix),
+                "--loglevel",
+                "WARNING",
+                *(user_classes or []),
+                *(extra_args or []),
+            ]
+            proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+            stats_path = Path(f"{csv_prefix}_stats.csv")
+            if not stats_path.exists():
+                raise PerfRunError(
+                    f"locust did not produce stats (exit code {proc.returncode}).\n"
+                    f"cmd: {' '.join(cmd)}\n--- stdout ---\n{proc.stdout}\n--- stderr ---\n{proc.stderr}"
+                )
+            return PerfResult._from_csv(csv_prefix, returncode=proc.returncode, stdout=proc.stdout)

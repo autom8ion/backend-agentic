@@ -29,9 +29,9 @@ from backend_agentic.core.exceptions import GraphQLResponseError
 class GraphQLResult:
     response: httpx.Response
     data: Any
-    errors: list[dict] | None
+    errors: list[dict[str, object]] | None
 
-    def raise_for_errors(self) -> "GraphQLResult":
+    def raise_for_errors(self) -> GraphQLResult:
         if self.errors:
             raise GraphQLResponseError(self.errors, self.data)
         return self

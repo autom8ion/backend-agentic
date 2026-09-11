@@ -9,6 +9,8 @@ always ``return self``).
 
 from __future__ import annotations
 
+from typing import Any
+
 from assertpy2 import add_extension
 
 from backend_agentic.perf.agent import PerfResult
@@ -17,7 +19,7 @@ from backend_agentic.reconciliation.agent import ReconciliationResult
 _registered = False
 
 
-def has_status_code(self, *expected: int):  # noqa: ANN001 - assertpy2 extension convention
+def has_status_code(self: Any, *expected: int) -> Any:
     """``assert_that(response).has_status_code(200, 201)``"""
     response = self.val
     if not hasattr(response, "status_code"):
@@ -33,7 +35,7 @@ def has_status_code(self, *expected: int):  # noqa: ANN001 - assertpy2 extension
     return self
 
 
-def is_fully_reconciled(self):  # noqa: ANN001
+def is_fully_reconciled(self: Any) -> Any:
     """``assert_that(reconciliation_result).is_fully_reconciled()``"""
     result = self.val
     if not isinstance(result, ReconciliationResult):
@@ -43,7 +45,13 @@ def is_fully_reconciled(self):  # noqa: ANN001
     return self
 
 
-def meets_slo(self, *, max_failure_ratio: float | None = None, max_p95_ms: float | None = None, endpoint: str | None = None):  # noqa: ANN001
+def meets_slo(
+    self: Any,
+    *,
+    max_failure_ratio: float | None = None,
+    max_p95_ms: float | None = None,
+    endpoint: str | None = None,
+) -> Any:
     """``assert_that(perf_result).meets_slo(max_failure_ratio=0.01, max_p95_ms=300)``
 
     Checks the aggregate stats by default; pass ``endpoint`` (as named in the

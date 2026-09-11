@@ -10,9 +10,10 @@ traceable both in the terminal and in the final timeline dump.
 from __future__ import annotations
 
 import time
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from typing import Any, Iterator
+from typing import Any
 
 import structlog
 
@@ -43,7 +44,7 @@ def step(
     started = time.monotonic()
     try:
         yield s
-    except Exception as exc:  # noqa: BLE001 - re-raised after recording
+    except Exception as exc:
         s.error = f"{type(exc).__name__}: {exc}"
         log.error("step.failed", error=s.error)
         raise

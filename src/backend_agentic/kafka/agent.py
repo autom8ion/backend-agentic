@@ -21,8 +21,9 @@ from __future__ import annotations
 import json
 import time
 import uuid
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 try:
     import polars as pl
@@ -52,7 +53,9 @@ class KafkaMessage:
 
 
 def _decode_headers(message: Message) -> dict[str, bytes]:
-    return {k: v for k, v in (message.headers() or [])}
+    raw_headers = message.headers()
+    items = raw_headers.items() if isinstance(raw_headers, dict) else (raw_headers or [])
+    return {k: (v if isinstance(v, bytes) else v.encode("utf-8")) for k, v in items if v is not None}
 
 
 class KafkaAgent(BaseAgent):
@@ -132,12 +135,17 @@ class KafkaAgent(BaseAgent):
                 continue
             if raw.error():
                 raise KafkaException(raw.error())
+            msg_topic, partition, offset, value = raw.topic(), raw.partition(), raw.offset(), raw.value()
+            assert msg_topic is not None and partition is not None and offset is not None and value is not None, (
+                f"consumer.poll() returned an errorless message with a missing field: {raw}"
+            )
+            raw_key = raw.key()
             msg = KafkaMessage(
-                topic=raw.topic(),
-                partition=raw.partition(),
-                offset=raw.offset(),
-                key=raw.key().decode("utf-8") if raw.key() else None,
-                value=value_deserializer(raw.value()),
+                topic=msg_topic,
+                partition=partition,
+                offset=offset,
+                key=raw_key.decode("utf-8") if raw_key is not None else None,
+                value=value_deserializer(value),
                 headers=_decode_headers(raw),
                 timestamp_ms=raw.timestamp()[1],
             )
@@ -184,7 +192,7 @@ class KafkaAgent(BaseAgent):
         group_id: str | None = None,
         from_beginning: bool = True,
         value_deserializer: Callable[[bytes], Any] = json.loads,
-    ) -> "pl.DataFrame":
+    ) -> pl.DataFrame:
         """Collect a topic's messages into a polars DataFrame, for reconciliation."""
         messages = self.consume_all(
             topic, timeout=timeout, group_id=group_id, from_beginning=from_beginning,

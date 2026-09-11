@@ -5,7 +5,7 @@ class BackendAgenticError(Exception):
 class GraphQLResponseError(BackendAgenticError):
     """The GraphQL server responded with a top-level ``errors`` array."""
 
-    def __init__(self, errors: list[dict], data: object | None = None) -> None:
+    def __init__(self, errors: list[dict[str, object]], data: object | None = None) -> None:
         self.errors = errors
         self.data = data
         super().__init__(f"GraphQL request returned {len(errors)} error(s): {errors}")

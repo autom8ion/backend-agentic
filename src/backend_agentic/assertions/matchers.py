@@ -34,7 +34,7 @@ class _IsoDatetimeMatcher(BaseMatcher):
         if not isinstance(value, str):
             return False
         try:
-            datetime.fromisoformat(value.replace("Z", "+00:00"))
+            datetime.fromisoformat(value)
             return True
         except ValueError:
             return False
